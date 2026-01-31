@@ -182,7 +182,6 @@ function createCalendarDay(date, price, previousPrice, isTodayFlag) {
         : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
 
     dayEl.innerHTML = `
-        <div class="day-name">${getDayName(date)}</div>
         <div class="day-date">${getDateNumber(date)}</div>
         <div class="price">${formatPrice(price)}</div>
         <div class="indicator">
