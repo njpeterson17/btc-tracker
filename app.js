@@ -1,4 +1,4 @@
-// Bitcoin Price Tracker - Fetches 7-day price history from CoinGecko API
+// Bitcoin Price Tracker - Fetches 7-day and 365-day price history from CoinGecko API
 
 const API_BASE_URL = 'https://api.coingecko.com/api/v3';
 
@@ -6,6 +6,8 @@ const API_BASE_URL = 'https://api.coingecko.com/api/v3';
 const currentPriceEl = document.getElementById('currentPrice');
 const priceChangeEl = document.getElementById('priceChange');
 const calendarGridEl = document.getElementById('calendarGrid');
+const yearCalendarEl = document.getElementById('yearCalendar');
+const yearStatsEl = document.getElementById('yearStats');
 const lastUpdatedEl = document.getElementById('lastUpdated');
 
 // Format price with currency
@@ -57,6 +59,27 @@ async function fetchBitcoinData() {
         return data;
     } catch (error) {
         console.error('Error fetching Bitcoin data:', error);
+        throw error;
+    }
+}
+
+// Fetch Bitcoin price data for the last 365 days
+async function fetchYearBitcoinData() {
+    try {
+        // Get data for the last 365 days with daily granularity
+        const days = 365;
+        const response = await fetch(
+            `${API_BASE_URL}/coins/bitcoin/market_chart?vs_currency=usd&days=${days}&interval=daily`
+        );
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch year Bitcoin data');
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error fetching year Bitcoin data:', error);
         throw error;
     }
 }
@@ -136,6 +159,100 @@ function showError(message) {
             <button onclick="init()">Try Again</button>
         </div>
     `;
+    if (yearCalendarEl) {
+        yearCalendarEl.innerHTML = `
+            <div class="error" style="grid-column: 1 / -1; padding: 20px;">
+                <p>Failed to load year data</p>
+            </div>
+        `;
+    }
+}
+
+// Format compact price for year calendar (e.g., "42K" for $42,000)
+function formatCompactPrice(price) {
+    if (price >= 100000) {
+        return (price / 1000).toFixed(0) + 'K';
+    } else if (price >= 1000) {
+        return (price / 1000).toFixed(1) + 'K';
+    }
+    return price.toFixed(0);
+}
+
+// Create year calendar day element
+function createYearDay(date, price, previousPrice) {
+    const dayEl = document.createElement('div');
+    dayEl.className = 'year-day';
+    
+    // Determine if price went up or down compared to previous day
+    let changePercent = 0;
+    let direction = 'neutral';
+    
+    if (previousPrice !== null) {
+        changePercent = ((price - previousPrice) / previousPrice) * 100;
+        direction = changePercent >= 0 ? 'up' : 'down';
+    }
+    
+    dayEl.classList.add(direction);
+    
+    if (isToday(date)) {
+        dayEl.classList.add('today');
+    }
+    
+    // Create tooltip content
+    const dateStr = date.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+    });
+    const changeStr = previousPrice !== null ? formatPercentage(changePercent) : 'N/A';
+    dayEl.setAttribute('data-tooltip', `${dateStr}: ${formatPrice(price)} (${changeStr})`);
+    
+    // Add price in corner
+    const priceEl = document.createElement('span');
+    priceEl.className = 'price-corner';
+    priceEl.textContent = formatCompactPrice(price);
+    dayEl.appendChild(priceEl);
+    
+    return { element: dayEl, direction };
+}
+
+// Render the 365-day calendar
+function renderYearCalendar(priceData) {
+    if (!yearCalendarEl) return;
+    
+    yearCalendarEl.innerHTML = '';
+    
+    const prices = priceData.prices;
+    const today = new Date();
+    let upDays = 0;
+    let downDays = 0;
+    
+    // Get the last 365 data points (or all available)
+    const displayData = prices.slice(-365);
+    
+    displayData.forEach((dataPoint, index) => {
+        const [timestamp, price] = dataPoint;
+        const date = new Date(timestamp);
+        
+        // Get previous day price for comparison
+        const previousPrice = index > 0 ? displayData[index - 1][1] : null;
+        
+        const { element: dayEl, direction } = createYearDay(date, price, previousPrice);
+        yearCalendarEl.appendChild(dayEl);
+        
+        // Count up/down days
+        if (direction === 'up') upDays++;
+        if (direction === 'down') downDays++;
+    });
+    
+    // Update year stats
+    if (yearStatsEl) {
+        yearStatsEl.innerHTML = `
+            <span class="stat up-days">${upDays} up days</span>
+            <span class="stat down-days">${downDays} down days</span>
+        `;
+    }
 }
 
 // Render the 7-day calendar
@@ -185,13 +302,15 @@ async function init() {
     showLoading();
     
     try {
-        // Fetch both current price and historical data
-        const [historicalData, currentData] = await Promise.all([
+        // Fetch current price, 7-day data, and 365-day data
+        const [historicalData, yearData, currentData] = await Promise.all([
             fetchBitcoinData(),
+            fetchYearBitcoinData(),
             fetchCurrentPrice()
         ]);
         
         renderCalendar(historicalData);
+        renderYearCalendar(yearData);
         updateCurrentPrice(currentData);
         updateTimestamp();
         
