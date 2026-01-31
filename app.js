@@ -1,6 +1,6 @@
 // Crypto Price Tracker - Fetches price history from Binance API (CORS-enabled)
 
-const API_BASE_URL = 'https://api.binance.com/api/v3';
+const API_BASE_URL = 'https://data-api.binance.vision/api/v3';
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 const COIN_KEY = 'crypto_coin';
 
