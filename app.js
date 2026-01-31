@@ -87,7 +87,7 @@ function updateCoinUI() {
     });
 
     // Update document title
-    document.title = `${coin.name} Price Tracker`;
+    document.title = `${coin.name} Tracker`;
 }
 
 // Initialize coin tabs
