@@ -1,15 +1,16 @@
-// Crypto Price Tracker - Fetches 7-day and 365-day price history from CoinCap API
+// Crypto Price Tracker - Fetches price history from Binance API (CORS-enabled)
 
-const API_BASE_URL = 'https://api.coincap.io/v2';
+const API_BASE_URL = 'https://api.binance.com/api/v3';
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 const COIN_KEY = 'crypto_coin';
 
-// Coin configuration
+// Coin configuration (using Binance trading pairs)
 const COINS = {
     bitcoin: {
         id: 'bitcoin',
+        symbol: 'BTCUSDT',
         name: 'Bitcoin',
-        symbol: 'BTC',
+        displaySymbol: 'BTC',
         color: '#F7931A',
         logo: `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="12" cy="12" r="10" stroke="#F7931A" stroke-width="2"/>
@@ -18,8 +19,9 @@ const COINS = {
     },
     ethereum: {
         id: 'ethereum',
+        symbol: 'ETHUSDT',
         name: 'Ethereum',
-        symbol: 'ETH',
+        displaySymbol: 'ETH',
         color: '#627EEA',
         logo: `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 1.5L4.5 12.25L12 16.5L19.5 12.25L12 1.5Z" stroke="#627EEA" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
@@ -86,7 +88,6 @@ function updateCoinUI() {
 let coinTabsInitialized = false;
 function initCoinTabs() {
     if (!coinTabsInitialized) {
-        // Use event delegation on parent
         const tabContainer = document.querySelector('.coin-tabs');
         if (tabContainer) {
             tabContainer.addEventListener('click', (e) => {
@@ -104,7 +105,7 @@ function initCoinTabs() {
     updateCoinUI();
 }
 
-// Hide currency selector (CoinCap only supports USD)
+// Hide currency selector (Binance pairs are in USDT)
 function initCurrencySelector() {
     if (currencySelectorEl) {
         currencySelectorEl.parentElement.style.display = 'none';
@@ -138,7 +139,7 @@ function isToday(date) {
     return date.toDateString() === today.toDateString();
 }
 
-// Fetch with exponential backoff retry for rate limiting
+// Fetch with retry
 async function fetchWithRetry(url, retries = 3, delay = 1000) {
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
@@ -173,18 +174,17 @@ async function fetchWithRetry(url, retries = 3, delay = 1000) {
     }
 }
 
-// Fetch historical price data from CoinCap
+// Fetch historical klines from Binance
 async function fetchCoinHistory(days = 7) {
     const coin = getCurrentCoin();
-    const end = Date.now();
-    const start = end - (days * 24 * 60 * 60 * 1000);
-    const url = `${API_BASE_URL}/assets/${coin.id}/history?interval=d1&start=${start}&end=${end}`;
+    // Binance klines: each entry is [openTime, open, high, low, close, volume, closeTime, ...]
+    const url = `${API_BASE_URL}/klines?symbol=${coin.symbol}&interval=1d&limit=${days + 1}`;
     const response = await fetchWithRetry(url);
 
-    // Convert CoinCap format to our expected format
-    const prices = response.data.map(item => [
-        item.time,
-        parseFloat(item.priceUsd)
+    // Convert Binance kline format to our expected format [timestamp, closePrice]
+    const prices = response.map(kline => [
+        kline[0], // Open time
+        parseFloat(kline[4]) // Close price
     ]);
 
     return { prices };
@@ -193,7 +193,7 @@ async function fetchCoinHistory(days = 7) {
 // Get cache key for current coin
 function getCacheKey() {
     const coin = getCurrentCoin();
-    return `${coin.id}_year_data_coincap`;
+    return `${coin.id}_year_data_binance`;
 }
 
 // Get cached year data or fetch fresh
@@ -226,15 +226,15 @@ async function getCachedYearData() {
     return data;
 }
 
-// Fetch current price and 24h change from CoinCap
+// Fetch current price and 24h change from Binance
 async function fetchCurrentPrice() {
     const coin = getCurrentCoin();
-    const url = `${API_BASE_URL}/assets/${coin.id}`;
+    const url = `${API_BASE_URL}/ticker/24hr?symbol=${coin.symbol}`;
     const response = await fetchWithRetry(url);
 
     return {
-        price: parseFloat(response.data.priceUsd),
-        change24h: parseFloat(response.data.changePercent24Hr)
+        price: parseFloat(response.lastPrice),
+        change24h: parseFloat(response.priceChangePercent)
     };
 }
 
@@ -275,7 +275,7 @@ function createCalendarDay(date, price, previousPrice, isTodayFlag) {
     return dayEl;
 }
 
-// Show loading state for both calendars
+// Show loading state
 function showLoading() {
     calendarGridEl.innerHTML = `
         <div class="loading" style="grid-column: 1 / -1;">
@@ -291,7 +291,7 @@ function showLoading() {
     }
 }
 
-// Show error state (XSS-safe)
+// Show error state
 function showError(message) {
     calendarGridEl.innerHTML = '';
     const errorDiv = document.createElement('div');
@@ -324,7 +324,7 @@ function showError(message) {
     }
 }
 
-// Format compact price for year calendar
+// Format compact price
 function formatCompactPrice(price) {
     if (price >= 100000) {
         return (price / 1000).toFixed(0) + 'K';
@@ -377,7 +377,7 @@ function createYearDay(date, price, previousPrice, showPrice = true, index = 0) 
     return { element: dayEl, direction };
 }
 
-// Create empty placeholder for year calendar
+// Create empty placeholder
 function createEmptyDay() {
     const dayEl = document.createElement('div');
     dayEl.className = 'year-day neutral';
@@ -386,7 +386,7 @@ function createEmptyDay() {
     return dayEl;
 }
 
-// Setup keyboard navigation for year calendar
+// Setup keyboard navigation
 function setupYearCalendarKeyboardNav() {
     if (!yearCalendarEl) return;
 
@@ -432,7 +432,7 @@ function setupYearCalendarKeyboardNav() {
     });
 }
 
-// Render the 365-day calendar
+// Render 365-day calendar
 function renderYearCalendar(priceData) {
     if (!yearCalendarEl) return;
 
@@ -481,7 +481,7 @@ function renderYearCalendar(priceData) {
     setupYearCalendarKeyboardNav();
 }
 
-// Render the 7-day calendar
+// Render 7-day calendar
 function renderCalendar(priceData) {
     const coin = getCurrentCoin();
     calendarGridEl.innerHTML = '';
@@ -513,7 +513,7 @@ function updateCurrentPrice(priceData) {
     }
 }
 
-// Update last updated timestamp
+// Update timestamp
 function updateTimestamp() {
     const now = new Date();
     lastUpdatedEl.textContent = `Last updated: ${now.toLocaleString()}`;
@@ -526,7 +526,6 @@ async function init() {
     initCoinTabs();
 
     try {
-        // Fetch data sequentially to avoid rate limits
         const currentData = await fetchCurrentPrice();
         const historicalData = await fetchCoinHistory(7);
         const yearData = await getCachedYearData();
