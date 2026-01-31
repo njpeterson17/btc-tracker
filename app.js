@@ -179,7 +179,7 @@ function formatCompactPrice(price) {
 }
 
 // Create year calendar day element
-function createYearDay(date, price, previousPrice) {
+function createYearDay(date, price, previousPrice, showPrice = true) {
     const dayEl = document.createElement('div');
     dayEl.className = 'year-day';
     
@@ -208,13 +208,23 @@ function createYearDay(date, price, previousPrice) {
     const changeStr = previousPrice !== null ? formatPercentage(changePercent) : 'N/A';
     dayEl.setAttribute('data-tooltip', `${dateStr}: ${formatPrice(price)} (${changeStr})`);
     
-    // Add price in corner
-    const priceEl = document.createElement('span');
-    priceEl.className = 'price-corner';
-    priceEl.textContent = formatCompactPrice(price);
-    dayEl.appendChild(priceEl);
+    // Add price in corner (only on larger screens)
+    if (showPrice) {
+        const priceEl = document.createElement('span');
+        priceEl.className = 'price-corner';
+        priceEl.textContent = formatCompactPrice(price);
+        dayEl.appendChild(priceEl);
+    }
     
     return { element: dayEl, direction };
+}
+
+// Create empty placeholder for year calendar
+function createEmptyDay() {
+    const dayEl = document.createElement('div');
+    dayEl.className = 'year-day neutral';
+    dayEl.style.visibility = 'hidden';
+    return dayEl;
 }
 
 // Render the 365-day calendar
@@ -231,6 +241,21 @@ function renderYearCalendar(priceData) {
     // Get the last 365 data points (or all available)
     const displayData = prices.slice(-365);
     
+    if (displayData.length === 0) return;
+    
+    // Get the day of week for the first data point (0 = Sunday, 6 = Saturday)
+    const firstDate = new Date(displayData[0][0]);
+    const startDayOfWeek = firstDate.getDay();
+    
+    // Add empty placeholders to align the first day to the correct column
+    // This ensures the calendar displays in a proper weekly grid
+    for (let i = 0; i < startDayOfWeek; i++) {
+        yearCalendarEl.appendChild(createEmptyDay());
+    }
+    
+    // Check if we should show prices (based on screen width)
+    const showPrices = window.innerWidth > 1200;
+    
     displayData.forEach((dataPoint, index) => {
         const [timestamp, price] = dataPoint;
         const date = new Date(timestamp);
@@ -238,7 +263,7 @@ function renderYearCalendar(priceData) {
         // Get previous day price for comparison
         const previousPrice = index > 0 ? displayData[index - 1][1] : null;
         
-        const { element: dayEl, direction } = createYearDay(date, price, previousPrice);
+        const { element: dayEl, direction } = createYearDay(date, price, previousPrice, showPrices);
         yearCalendarEl.appendChild(dayEl);
         
         // Count up/down days

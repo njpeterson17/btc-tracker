@@ -151,20 +151,23 @@ header {
 .year-calendar {
     display: grid;
     grid-template-columns: repeat(53, 1fr);
-    gap: 3px;
-    padding: 20px;
+    gap: 2px;
+    padding: 15px;
     background: var(--bg-card);
     border-radius: 16px;
     overflow-x: auto;
+    max-width: 100%;
 }
 
 .year-day {
     aspect-ratio: 1;
-    min-width: 10px;
-    border-radius: 3px;
+    min-width: 8px;
+    max-width: 16px;
+    border-radius: 2px;
     position: relative;
     cursor: pointer;
     transition: all 0.2s ease;
+    overflow: hidden;
 }
 
 .year-day:hover {
@@ -258,34 +261,65 @@ header {
     align-items: center;
 }
 
-/* Price indicator in corner */
+/* Price indicator in corner - hidden by default, show on larger screens */
 .year-day .price-corner {
     position: absolute;
-    bottom: 2px;
-    right: 2px;
-    font-size: 6px;
+    bottom: 1px;
+    right: 1px;
+    font-size: 5px;
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.9);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    color: rgba(255, 255, 255, 0.95);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
     line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+    max-width: 90%;
+}
+
+/* Hide price text on small squares */
+@media (max-width: 1200px) {
+    .year-day .price-corner {
+        display: none;
+    }
 }
 
 /* Responsive year calendar */
 @media (max-width: 900px) {
     .year-calendar {
-        grid-template-columns: repeat(26, 1fr);
+        gap: 2px;
+        padding: 12px;
+    }
+    
+    .year-day {
+        min-width: 6px;
+        border-radius: 2px;
+    }
+    
+    .year-day .price-corner {
+        display: none;
     }
 }
 
 @media (max-width: 600px) {
     .year-calendar {
-        grid-template-columns: repeat(18, 1fr);
-        gap: 2px;
+        gap: 1px;
+        padding: 10px;
+    }
+    
+    .year-day {
+        min-width: 5px;
+        border-radius: 1px;
     }
     
     .year-stats {
         width: 100%;
         justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .year-day:hover {
+        transform: scale(1.5);
     }
 }
 
